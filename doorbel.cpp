@@ -2,14 +2,14 @@
 #include <PubSubClient.h>
 
 // ----------- WiFi instellingen ------------
-const char* ssid = "FRITZ!Box 7590 CM";
-const char* password = "17313739020905744043";
+const char* ssid = "xxxxxxxxxx";
+const char* password = "xxxxxxxxxxxxx";
 
 // ----------- MQTT instellingen ------------
 const char* mqtt_server = "192.168.178.52";
 const int mqtt_port = 1883;
-const char* mqtt_user = "mqtt";
-const char* mqtt_pass = "mqtt";
+const char* mqtt_user = "xxxxxxxx";
+const char* mqtt_pass = "xxxxxxxxt";
 
 // ----------- Domoticz instellingen --------
 const char* domoticz_topic = "domoticz/in";
