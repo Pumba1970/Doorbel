@@ -1,124 +1,56 @@
-#include <ESP8266WiFi.h>
-#include <PubSubClient.h>
+#include <Arduino.h>
 
-// ----------- WiFi instellingen ------------
-const char* ssid = "xxxxxxxxxx";
-const char* password = "xxxxxxxxxxxxx";
+// Define pins
+const int lightSensorPin = A0; // Analog pin for LM393 sensor
+const int relayPin = 7;        // Digital pin for relay
 
-// ----------- MQTT instellingen ------------
-const char* mqtt_server = "192.168.xxx.xxx";
-const int mqtt_port = 1883;
-const char* mqtt_user = "xxxxxxxx";
-const char* mqtt_pass = "xxxxxxxxt";
+// Define timing variables
+const unsigned long relayOnDuration = 500;   // Relay ON time in milliseconds (0.5 sec)
+const unsigned long cooldownDuration = 4000; // Cooldown time in milliseconds (4 sec)
 
-// ----------- Domoticz instellingen --------
-const char* domoticz_topic = "domoticz/in";
-const int domoticz_idx = 304;  // IDX van virtuele deurbel
+// Variables to manage state
+unsigned long lastActivationTime = 0; // Last time relay was activated
+bool relayActive = false;             // Relay state
 
-// ----------- Pin configuratie -------------
-const int lightSensorPin = A0;
-const int relayPin = D1; // GPIO5
+// Threshold for the LM393 light sensor
+const int lightThreshold = 500; // Adjust based on your sensor and environment
 
-// ----------- Relay timing -----------------
-const unsigned long relayOnDuration = 500;   // 0.5 seconden
-const unsigned long cooldownDuration = 5000; // 5 seconden cooldown
-
-// ----------- Statusvariabelen ------------
-unsigned long lastActivationTime = 0;
-bool relayActive = false;
-bool previousRelayState = false;
-const int lightThreshold = 500; // Pas dit aan indien nodig
-
-// ----------- MQTT client ------------------
-WiFiClient espClient;
-PubSubClient client(espClient);
-
-// ----------- Functiedeclaraties -----------
-void mqttCallback(char* topic, byte* payload, unsigned int length);
-void reconnect();
+// Function declarations
 void activateRelay();
 void deactivateRelay();
-void sendDomoticzRelayStatus(bool status);
 
-// ----------- Setup ------------------------
 void setup() {
-  Serial.begin(115200);
-  pinMode(relayPin, OUTPUT);
-  digitalWrite(relayPin, LOW);
-
-  // Verbinden met WiFi
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi verbonden");
-
-  // MQTT setup
-  client.setServer(mqtt_server, mqtt_port);
-  client.setCallback(mqttCallback);
-  reconnect();
+  pinMode(relayPin, OUTPUT); // Set relay pin as output
+  digitalWrite(relayPin, LOW); // Start with the relay OFF
+  Serial.begin(9600);         // Initialize serial monitor for debugging
 }
 
-// ----------- Loop -------------------------
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
-  client.loop();
+  int lightValue = analogRead(lightSensorPin); // Read light sensor value
 
-  int lightValue = analogRead(lightSensorPin);
+  // Debugging: Print light sensor value
+  Serial.println(lightValue);
 
+  // Check if light level is below the threshold and cooldown is over
   if (lightValue < lightThreshold && (millis() - lastActivationTime > cooldownDuration)) {
-    activateRelay();
+    activateRelay(); // Activate the relay
   }
 
+  // Manage relay deactivation after the ON duration
   if (relayActive && millis() - lastActivationTime >= relayOnDuration) {
-    deactivateRelay();
-  }
-
-  if (relayActive != previousRelayState) {
-    sendDomoticzRelayStatus(relayActive);
-    previousRelayState = relayActive;
+    deactivateRelay(); // Turn off the relay
   }
 }
 
-// ----------- Functies ---------------------
 void activateRelay() {
-  digitalWrite(relayPin, HIGH);
-  lastActivationTime = millis();
-  relayActive = true;
-  Serial.println("Relais AAN");
+  digitalWrite(relayPin, HIGH); // Turn ON the relay
+  lastActivationTime = millis(); // Record the activation time
+  relayActive = true;            // Mark relay as active
+  Serial.println("Relay activated");
 }
 
 void deactivateRelay() {
-  digitalWrite(relayPin, LOW);
-  relayActive = false;
-  Serial.println("Relais UIT");
-}
-
-void sendDomoticzRelayStatus(bool status) {
-  String payload = String("{\"idx\":") + domoticz_idx +
-                   ",\"nvalue\":" + (status ? "1" : "0") + ",\"svalue\":\"\"}";
-  client.publish(domoticz_topic, payload.c_str());
-  Serial.print("Naar Domoticz gestuurd: ");
-  Serial.println(payload);
-}
-
-void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  // Inkomende berichten (optioneel te gebruiken)
-}
-
-void reconnect() {
-  while (!client.connected()) {
-    Serial.print("Verbinding maken met MQTT...");
-    if (client.connect("WemosD1", mqtt_user, mqtt_pass)) {
-      Serial.println("Verbonden!");
-      client.subscribe(domoticz_topic); // Abonneren (indien nodig)
-    } else {
-      Serial.print("Fout, code: ");
-      Serial.println(client.state());
-      delay(5000);
-    }
-  }
+  digitalWrite(relayPin, LOW); // Turn OFF the relay
+  relayActive = false;         // Mark relay as inactive
+  Serial.println("Relay deactivated");
 }
